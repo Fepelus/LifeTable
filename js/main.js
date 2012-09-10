@@ -45,18 +45,30 @@ var LifeTable = (function () {
 
 var Person = Backbone.Model.extend({
 	defaults: {
-		age: 39,
+		day: 19,
+		month: 9,
+		year: 1973,
 		sex: "male"
 	},
 
+	get_birthday: function () {
+		return moment(new Date(this.get("year"),this.get("month"),this.get("day")));
+	},
+
+	get_age: function () {
+		return Math.floor(moment().diff(this.get_birthday(), 'years',true));
+	},
+
 	life_expectancy: function () {
-		return LifeTable.lookup(this.get("sex"),this.get("age"));
+		return LifeTable.lookup(this.get("sex"),this.get_age());
 	},
 
 	difference_in: function (unit) {
-		var now = moment(), death = moment().add('years', this.life_expectancy());
-		return death.diff(now, unit);
+		var death = this.get_birthday().add('years',this.get_age()).add('years', this.life_expectancy());
+		return death.diff(moment(), unit);
 	}
+
+
 });
 
 var thisPerson = new Person;
@@ -76,13 +88,24 @@ InputView = Backbone.View.extend({
 		"change select": "selectionChanged"
 	},
 	original_options: function () {
-		for (i=0; i<=100; i++) {
+		var thisyear = parseInt(moment().format('YYYY'));
+		for (i=1; i<=31; i++) {
 			var content = $("<option></option>").val(i).text(i);
-			$('select#age').append(content);
+			$('select#day').append(content);
+		}
+		for (i=0; i<12; i++) {
+			var content = $("<option></option>").val(i+1).text(moment.monthsShort[i]);
+			$('select#month').append(content);
+		}
+		for (i=thisyear-100; i<=thisyear; i++) {
+			var content = $("<option></option>").val(i).text(i);
+			$('select#year').append(content);
 		}
 	},
 	original_selections: function () {
-		$('select#age').val(this.model.get('age'));
+		$('select#day').val(this.model.get('day'));
+		$('select#month').val(this.model.get('month'));
+		$('select#year').val(this.model.get('year'));
 		$('select#sex').val(this.model.get('sex'));
 	},
     selectionChanged: function (e) {
@@ -99,10 +122,11 @@ PersonView = Backbone.View.extend({
 	initialize: function () {
 		this.render();
 		this.model.bind('change', this.render, this);
+		this.model.bind('ping', this.render, this);
 	},
 	render: function () {
 		var variables = {
-			"age": this.model.get("age"),
+			"age": this.model.get_age(),
 			"sex": this.model.get("sex"),
 			"life_expectancy_years": this.model.difference_in('years'),
 			"life_expectancy_days": this.model.difference_in('days'),
