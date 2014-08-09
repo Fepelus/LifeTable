@@ -74,6 +74,13 @@ var LifeTable = (function () {
 	return {
 		lookup: function (sex, age) {
 				return thetable[sex][age]["ex"];
+		},
+		chance_of_death_in_next_years: function (sex,age,next_years) {
+			var chance_of_living=1, adjusted_age = age-1, i = next_years;
+			for (; i>0; i--) {
+				chance_of_living=chance_of_living * (1-thetable[sex][adjusted_age+i]["qx"]);
+			}
+			return 1-chance_of_living;
 		}
 	};
 
@@ -81,15 +88,17 @@ var LifeTable = (function () {
 
 var Person = Backbone.Model.extend({
 	defaults: {
-		day: 19,
-		month: 9,
-		year: 1973,
+		day: 1,
+		month: 1,
+		year: 1990,
 		sex: "male"
 	},
 
 	initialize: function () {
 		this.load_from_storage();
+		this.on('change', this.save_to_storage, this);
 	},
+
 
 	load_from_storage: function () {
 		var retrievedObject, parsedObject;
@@ -114,7 +123,8 @@ var Person = Backbone.Model.extend({
 	},
 
 	get_birthday: function () {
-		return moment(new Date(this.get("year"),this.get("month"),this.get("day")));
+		// note: javascript months are 0-based while this model's months are 1-based
+		return moment(new Date(this.get("year"),this.get("month")-1,this.get("day")));
 	},
 
 	get_age: function () {
@@ -123,6 +133,10 @@ var Person = Backbone.Model.extend({
 
 	life_expectancy: function () {
 		return LifeTable.lookup(this.get("sex"),this.get_age());
+	},
+
+	chance_of_dying: function (years) {
+		return LifeTable.chance_of_death_in_next_years(this.get("sex"),this.get_age(), years);
 	},
 
 	difference_in: function (unit) {
@@ -176,7 +190,6 @@ InputView = Backbone.View.extend({
       var data = {};
       data[field.attr('id')] = value;
       this.model.set(data);
-      this.model.save_to_storage();
     }
 });
 
@@ -193,7 +206,10 @@ PersonView = Backbone.View.extend({
 			"sex": this.model.get("sex"),
 			"life_expectancy_years": this.model.difference_in('years'),
 			"life_expectancy_days": this.model.difference_in('days'),
-			"life_expectancy_hours": this.model.difference_in('hours')
+			"life_expectancy_hours": this.model.difference_in('hours'),
+			"five_year_chance": this.model.chance_of_dying(5).toFixed(3),
+			"ten_year_chance": this.model.chance_of_dying(10).toFixed(3),
+			"twenty_year_chance": this.model.chance_of_dying(20).toFixed(3)
 		};
 		var template = _.template( $("#outputtemplate").html(), variables );
 		this.$el.html(template);
